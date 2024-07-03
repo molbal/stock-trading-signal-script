@@ -5,6 +5,7 @@ const { EMA, MACD } = require('technicalindicators');
 const fs = require('fs').promises;
 var util = require('util');
 const path = require('path');
+const XLSX = require('xlsx');
 
 
 require('dotenv').config()
@@ -17,11 +18,11 @@ function sleep(ms) {
 
 const ALPACA_API_KEY = process.env.ALPACA_API_KEY;
 const ALPACA_SECRET_KEY = process.env.ALPACA_SECRET_KEY;
-const BASE_URL = 'https://paper-api.alpaca.markets';
-const DATA_URL = 'https://data.alpaca.markets';
-const CACHE_DIR = './temp/';
-const CACHE_EXPIRATION_HOURS = 8;
-const MAX_WAIT_TIME_MS = 333;
+const BASE_URL = process.env.BASE_URL;
+const DATA_URL = process.env.DATA_URL;
+const CACHE_DIR = process.env.CACHE_DIR;
+const CACHE_EXPIRATION_HOURS = process.env.CACHE_EXPIRATION_HOURS;
+const MAX_WAIT_TIME_MS = process.env.MAX_WAIT_TIME_MS;
 
 async function getStocks() {
   const queryParams = new URLSearchParams({
@@ -47,7 +48,7 @@ async function getStocks() {
     }
 
     const data = await response.json();
-    return data.filter(stock => stock.tradable);
+    return data.filter(stock => stock.tradable && !stock.symbol.includes('/'));
   } catch (error) {
     console.error('Error fetching stocks:', error);
     return [];
@@ -144,6 +145,71 @@ function calculateIndicators(bars) {
   return { ema200, macd };
 }
 
+
+async function generateExcelReport(results) {
+  const ws_data = [['Symbol', 'Name', 'Current Price', '200-Period EMA', 'MACD', 'Signal']];
+  
+  results.forEach(result => {
+    ws_data.push([
+      result.symbol,
+      result.name,
+      result.currentPrice,
+      result.ema200,
+      result.macd.MACD,
+      result.macd.signal
+    ]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(ws_data);
+
+  // Set column widths
+  const columnWidths = [
+    { wch: 10 }, // Symbol
+    { wch: 25 }, // Name
+    { wch: 15 }, // Current Price
+    { wch: 20 }, // 200-Period EMA
+    { wch: 10 }, // MACD
+    { wch: 10 }  // Signal
+  ];
+  ws['!cols'] = columnWidths;
+
+  // Apply proper formatting
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for (let C = range.s.c; C <= range.e.c; ++C) {
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+      const cell_address = { c: C, r: R };
+      const cell_ref = XLSX.utils.encode_cell(cell_address);
+      if (!ws[cell_ref]) continue;
+
+      if (R === 0 || C === 0) {
+        // Header row and first column formatting
+        ws[cell_ref].s = {
+          font: { bold: true, sz: 12 },
+          alignment: { horizontal: 'center', vertical: 'center' },
+          fill: { fgColor: { rgb: 'FFFFCC' } }
+        };
+      } else if (C === 2 || C === 3) {
+        // Currency formatting for "Current Price" and "200-Period EMA"
+        ws[cell_ref].z = '$#,##0.00';
+        ws[cell_ref].s = {
+          alignment: { horizontal: 'right', vertical: 'center' }
+        };
+      } else if (C >= 4) {
+        // Number formatting for "MACD" and "Signal"
+        ws[cell_ref].z = '#,##0.00';
+        ws[cell_ref].s = {
+          alignment: { horizontal: 'right', vertical: 'center' }
+        };
+      }
+    }
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Matching Stocks');
+  XLSX.writeFile(wb, 'matching_stocks-' + moment().format('YYYY-MM-DD') + '.xlsx');
+}
+
+
 async function main() {
   const stocks = await getStocks();
   const results = [];
@@ -165,7 +231,8 @@ async function main() {
     ) {
       results.push({
         symbol: stock.symbol,
-        currentPrice,
+        name: stock.name,
+        currentPrice: currentPrice,
         ema200: ema200[ema200.length - 1],
         macd: macd[macd.length - 1]
       });
@@ -179,7 +246,9 @@ async function main() {
     }
   }
 
-  console.log('Matching stocks:', results);
+  console.log('Exporting ', results.length,' results to xlsx.');
+  await generateExcelReport(results);
+  console.log('Done. Good luck trading.');
 }
 
 main();
