@@ -55,7 +55,7 @@ This repository contains a script that interacts with the Alpaca API to fetch st
 
 4. Run the script:
     ```bash
-    node index.js
+    node main.js
     ```
 
 ## Usage
