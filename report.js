@@ -1,6 +1,27 @@
 const XLSX = require('xlsx');
 const moment = require('moment');
 
+async function dumpxls(data, filename) {
+  
+  // Extract keys from the first object
+  const keys = Object.keys(data[0]);
+
+  // Initialize the transformed array with the keys
+  const transformed = [keys];
+
+  // Append each record as an array of values
+  data.forEach(record => {
+      const values = keys.map(key => record[key]);
+      transformed.push(values);
+  });
+
+
+  const ws = XLSX.utils.aoa_to_sheet(transformed);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Dump');
+  XLSX.writeFile(wb, filename+".xlsx")
+}
+
 async function generateExcelReport(results) {
   const ws_data = [['Symbol', 'Name', 'Current Price', '200-Period EMA', 'MACD', 'Signal']];
   
@@ -131,4 +152,4 @@ async function saveDebugReport(results) {
   XLSX.writeFile(wb, 'debug-report--' + moment().format('YYYY-MM-DD') + '.xlsx');
 }
 
-module.exports = { generateExcelReport, saveDebugReport };
+module.exports = { generateExcelReport, saveDebugReport, dumpxls };

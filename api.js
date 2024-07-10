@@ -2,6 +2,7 @@ const moment = require('moment');
 const path = require('path');
 const fs = require('fs').promises;
 const config = require('./config');
+const { dumpxls } = require('./report');
 const { sleep, readCache, writeCache, isCacheValid } = require('./utils');
 
 async function getStocks() {
@@ -33,7 +34,8 @@ async function getStocks() {
   }
 }
 
-async function getStockBars(symbol, timeframe = '4H', limit = 1000, adjustment = 'raw', feed = 'sip') {
+async function getStockBars(symbol, timeframe = '4H', limit = 1000, adjustment = 'raw', feed = 'sip', dumpxlss = false) {
+  console.log(dumpxlss);
   const headers = {
     accept: 'application/json',
     'APCA-API-KEY-ID': config.ALPACA_API_KEY,
@@ -87,6 +89,14 @@ async function getStockBars(symbol, timeframe = '4H', limit = 1000, adjustment =
     } while (pageToken);
 
     await writeCache(cacheFile, { bars: allBars });
+
+    if (dumpxlss === true) {
+      console.log('Dumping to debug-dump-'+symbol);
+      await dumpxls(allBars, 'debug-dump-'+symbol);
+    }
+    else {
+      console.log('not dumping');
+    }
 
     return allBars;
   } catch (error) {

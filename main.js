@@ -1,19 +1,34 @@
 const { getStocks, getStockBars } = require('./api');
 const { calculateIndicators } = require('./indicators');
-const { generateExcelReport, saveDebugReport } = require('./report');
+const { generateExcelReport, saveDebugReport, dumpxls } = require('./report');
 const tdqm = require('tqdm');
 const path = require('path');
 const fs = require('fs').promises;
+const yargs = require('yargs/yargs');
+const { hideBin } = require('yargs/helpers');
 
 async function main() {
-  await fs.mkdir('charts', { recursive: true });
-  const stocks = await getStocks();
+  const argv = yargs(hideBin(process.argv)).option('stocks', {
+    type: 'string',
+    describe: 'Comma-separated list of stock symbols to process',
+  }).option('dumpxls', {
+    type: 'boolean',
+    describe: 'If this flag is set, raw stocks data will be dumped as XLS',
+  }).argv;
+
+
+  let stocks = await getStocks();
+  if (argv.stocks) {
+    const specifiedStocks = argv.stocks.split(',').map(s => s.trim().toUpperCase());
+    stocks = stocks.filter(stock => specifiedStocks.includes(stock.symbol.toUpperCase()));
+  }
+
   const results = [];
   const debug = [];
   console.log('Listed', stocks.length, 'stocks');
 
   for (const stock of tdqm(stocks)) {
-    const bars = await getStockBars(stock.symbol);
+    const bars = await getStockBars(stock.symbol, '4H', 1000, 'raw', 'sip', argv.dumpxls || false);
 
     if (!bars || bars.length < 200) continue;
 
@@ -24,6 +39,26 @@ async function main() {
     const isMACDLessThanSignalDayA = macd[macd.length - 2].MACD < macd[macd.length - 2].signal;
     const isMACDGreaterThanSignalDayB = macd[macd.length - 1].MACD > macd[macd.length - 1].signal;
     const isMACDAndSignalNegative = macd[macd.length - 1].MACD < 0 && macd[macd.length - 1].signal < 0;
+
+    if (argv.dumpxls) {
+      console.log(bars.length, macd.length, ema200.length)
+      const dump = bars.map((bar, index) => ({
+        bar_c: bar.c,
+        bar_h: bar.h,
+        bar_l: bar.l,
+        bar_n: bar.n,
+        bar_o: bar.o,
+        bar_t: bar.t,
+        bar_v: bar.v,
+        bar_vw: bar.vw,
+        ema200: ema200[index] || 'unknown',
+        macd: macd[index] ? macd[index].MACD : 'unknown',
+        signal: macd[index] ? macd[index].signal : 'unknown'
+      }));
+
+      dumpxls(dump, 'dump-calculated-'+stock.symbol);
+
+    }
 
     if (
       isCurrentPriceAboveEMA200 &&
