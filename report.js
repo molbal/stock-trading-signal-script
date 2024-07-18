@@ -82,7 +82,7 @@ async function generateExcelReport(results) {
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Matching Stocks');
-  XLSX.writeFile(wb, 'matching_stocks-' + moment().format('YYYY-MM-DD') + '.xlsx');
+  XLSX.writeFile(wb, 'output/matching_stocks-' + moment().format('YYYY-MM-DD') + '.xlsx');
 }
 
 async function saveDebugReport(results) {
@@ -149,7 +149,7 @@ async function saveDebugReport(results) {
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Debug Stocks');
-  XLSX.writeFile(wb, 'debug-report--' + moment().format('YYYY-MM-DD') + '.xlsx');
+  XLSX.writeFile(wb, 'output/debug-report--' + moment().format('YYYY-MM-DD') + '.xlsx');
 }
 
 module.exports = { generateExcelReport, saveDebugReport, dumpxls };

@@ -5,6 +5,7 @@ const tdqm = require('tqdm');
 const path = require('path');
 const fs = require('fs').promises;
 const yargs = require('yargs/yargs');
+const moment = require('moment');
 const { hideBin } = require('yargs/helpers');
 
 async function main() {
@@ -16,6 +17,11 @@ async function main() {
     describe: 'If this flag is set, raw stocks data will be dumped as XLS',
   }).argv;
 
+  try {
+    await fs.mkdir('output');
+  } catch (e) {
+    // Ignore the error if the directory already exists
+  }
 
   let stocks = await getStocks();
   if (argv.stocks) {
@@ -25,10 +31,10 @@ async function main() {
 
   const results = [];
   const debug = [];
-  console.log('Listed', stocks.length, 'stocks');
+  console.log('Checking', stocks.length, 'stocks');
 
   for (const stock of tdqm(stocks)) {
-    const bars = await getStockBars(stock.symbol, '4H', 1000, 'raw', 'sip', argv.dumpxls || false);
+    const bars = await getStockBars(stock.symbol, '30Min', 5000, 'raw', 'sip', argv.dumpxls);
 
     if (!bars || bars.length < 200) continue;
 
@@ -41,23 +47,32 @@ async function main() {
     const isMACDAndSignalNegative = macd[macd.length - 1].MACD < 0 && macd[macd.length - 1].signal < 0;
 
     if (argv.dumpxls) {
-      console.log(bars.length, macd.length, ema200.length)
+      const emaPadLength = bars.length - ema200.length;
+      const macdPadLength = bars.length - macd.length;
+      
+      // Create arrays of nulls to pad ema200 and macd
+      const emaPadArray = Array(emaPadLength).fill({ index: 'N/A', MACD: 'N/A', signal: 'N/A' });
+      const macdPadArray = Array(macdPadLength).fill('N/A');
+
+      // Pad ema200 and macd with nulls
+      const paddedEma200 = emaPadArray.concat(ema200);
+      const paddedMacd = macdPadArray.concat(macd);
+
       const dump = bars.map((bar, index) => ({
-        bar_c: bar.c,
-        bar_h: bar.h,
-        bar_l: bar.l,
-        bar_n: bar.n,
-        bar_o: bar.o,
-        bar_t: bar.t,
-        bar_v: bar.v,
-        bar_vw: bar.vw,
-        ema200: ema200[index] || 'unknown',
-        macd: macd[index] ? macd[index].MACD : 'unknown',
-        signal: macd[index] ? macd[index].signal : 'unknown'
+        "Closing price": bar.c,
+        "High price": bar.h,
+        "Low price": bar.l,
+        "Trade count in the bar": bar.n,
+        "Opening price": bar.o,
+        "Timestamp": moment(bar.t).format(),
+        "Bar volume": bar.v,
+        "Bar volume in weighed avg price": bar.vw,
+        ema200: paddedEma200[index] || 'unknown',
+        macd: paddedMacd[index] ? paddedMacd[index].MACD : 'unknown',
+        signal: paddedMacd[index] ? paddedMacd[index].signal : 'unknown'
       }));
 
-      dumpxls(dump, 'dump-calculated-'+stock.symbol);
-
+      dumpxls(dump, 'output/dump-calculated-' + stock.symbol);
     }
 
     if (

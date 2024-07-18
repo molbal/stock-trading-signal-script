@@ -5,9 +5,9 @@ function calculateIndicators(bars) {
   const ema200 = EMA.calculate({ period: 200, values: closes });
   const macd = MACD.calculate({
     values: closes,
-    fastPeriod: 12,
-    slowPeriod: 26,
-    signalPeriod: 9,
+    fastPeriod: 5,
+    slowPeriod: 8,
+    signalPeriod: 3,
     SimpleMAOscillator: false,
     SimpleMASignal: false
   });
