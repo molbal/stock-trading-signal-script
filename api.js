@@ -104,7 +104,8 @@ async function getStockBars(symbol, timeframe = '30Min', limit = 5000, adjustmen
     await writeCache(cacheFile, { bars: aggregatedBars });
 
     if (dumpxlss === true) {
-      await dumpxls(aggregatedBars, 'temp/debug-dump-'+symbol);
+      await dumpxls(aggregatedBars, 'temp/debug-dump-aggregated-'+symbol);
+      await dumpxls(allBars, 'temp/debug-dump-all-'+symbol);
     }
 
     return aggregatedBars;
